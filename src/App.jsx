@@ -31,7 +31,9 @@ import {
   BookOpen,
   Star,
   thumbsUp,
-  Image as ImageIcon
+  Image as ImageIcon,
+  LogOut,
+  User
 } from 'lucide-react';
 
 // --- Mock Data ---
@@ -101,47 +103,94 @@ export default function App() {
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [inquirySent, setInquirySent] = useState(false);
   
+  // Auth State
+  const [user, setUser] = useState(null); // { name, type: 'buyer' | 'seller' }
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('signup'); // 'signup' or 'login'
+  const [authTargetRole, setAuthTargetRole] = useState('buyer'); // 'buyer' or 'seller'
+  const [pendingAction, setPendingAction] = useState(null); // function to run after login
+  
   // Data States
   const [activeProperties, setActiveProperties] = useState(INITIAL_PROPERTIES);
   const [pendingProperties, setPendingProperties] = useState([]);
-  const [isAdmin, setIsAdmin] = useState(false); // Admin toggle for demo
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const handleProtectedAction = (action, role) => {
+    if (user) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setAuthTargetRole(role);
+      setAuthMode('signup');
+      setShowAuthModal(true);
+    }
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setShowAuthModal(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setView('home');
+  };
 
   // --- Components ---
 
   const Navbar = () => (
     <nav className="sticky top-0 z-50 bg-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center cursor-pointer" onClick={() => setView('home')}>
+        <div className="flex justify-between items-center h-20">
+          {/* Logo */}
+          <div className="flex items-center cursor-pointer flex-shrink-0" onClick={() => setView('home')}>
             <Building className="h-8 w-8 text-teal-600" />
-            <span className="ml-2 text-xl font-bold text-gray-900">FlatConnecta</span>
-            {isAdmin && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Admin Mode</span>}
+            <span className="ml-2 text-xl font-bold text-gray-900">FlatConnectio</span>
+            {isAdmin && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Admin</span>}
           </div>
           
-          {/* Desktop Menu */}
-          <div className="hidden lg:flex items-center space-x-6">
-            <button onClick={() => setView('home')} className={`text-gray-700 hover:text-teal-600 ${view === 'home' ? 'font-bold text-teal-600' : ''}`}>Home</button>
-            <button onClick={() => setView('listing')} className={`text-gray-700 hover:text-teal-600 ${view === 'listing' ? 'font-bold text-teal-600' : ''}`}>Browse Flats</button>
-            <button onClick={() => setView('post')} className={`text-gray-700 hover:text-teal-600 ${view === 'post' ? 'font-bold text-teal-600' : ''}`}>List Property</button>
-            
-            {/* Split Sections */}
-            <button onClick={() => setView('howItWorks')} className={`text-gray-700 hover:text-teal-600 ${view === 'howItWorks' ? 'font-bold text-teal-600' : ''}`}>How It Works</button>
-            <button onClick={() => setView('benefits')} className={`text-gray-700 hover:text-teal-600 ${view === 'benefits' ? 'font-bold text-teal-600' : ''}`}>Benefits</button>
-            <button onClick={() => setView('faq')} className={`text-gray-700 hover:text-teal-600 ${view === 'faq' ? 'font-bold text-teal-600' : ''}`}>FAQs</button>
+          {/* Desktop Menu - Sequential Row */}
+          <div className="hidden xl:flex items-center space-x-1">
+            <button onClick={() => setView('home')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'home' ? 'text-teal-600' : ''}`}>Home</button>
+            <button onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'listing' ? 'text-teal-600' : ''}`}>Browse Flats</button>
+            <button onClick={() => handleProtectedAction(() => setView('post'), 'seller')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'post' ? 'text-teal-600' : ''}`}>List Property</button>
+            <button onClick={() => setView('howItWorks')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'howItWorks' ? 'text-teal-600' : ''}`}>How It Works</button>
+            <button onClick={() => setView('benefits')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'benefits' ? 'text-teal-600' : ''}`}>Benefits</button>
+            <button onClick={() => setView('faq')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'faq' ? 'text-teal-600' : ''}`}>FAQs</button>
 
-            {isAdmin ? (
-              <button onClick={() => setView('admin')} className={`text-red-600 font-semibold hover:text-red-800 ${view === 'admin' ? 'underline' : ''}`}>
-                Dashboard ({pendingProperties.length})
-              </button>
+            {user ? (
+              <div className="flex items-center ml-4 space-x-3">
+                <span className="text-sm text-gray-600 font-medium flex items-center bg-gray-100 px-3 py-1 rounded-full">
+                  <User className="h-4 w-4 mr-1" /> {user.name}
+                </span>
+                <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center">
+                  <LogOut className="h-4 w-4 mr-1" /> Logout
+                </button>
+              </div>
             ) : (
-              <button className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition">
-                Login
-              </button>
+              <div className="flex items-center ml-4 space-x-3">
+                <button 
+                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setShowAuthModal(true); }}
+                  className="bg-teal-50 text-teal-700 border border-teal-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-100 transition"
+                >
+                  Sign Up Buyer
+                </button>
+                <button 
+                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setShowAuthModal(true); }}
+                  className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-700 transition shadow-md"
+                >
+                  Sign Up Seller
+                </button>
+              </div>
             )}
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="flex items-center lg:hidden">
+          <div className="flex items-center xl:hidden">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-700">
               {isMenuOpen ? <X /> : <Menu />}
             </button>
@@ -151,30 +200,118 @@ export default function App() {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="lg:hidden bg-white border-t">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <button onClick={() => {setView('home'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Home</button>
-            <button onClick={() => {setView('listing'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Browse Flats</button>
-            <button onClick={() => {setView('post'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">List Property</button>
+        <div className="xl:hidden bg-white border-t">
+          <div className="px-4 pt-4 pb-4 space-y-2">
+            <button onClick={() => {setView('home'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">Home</button>
+            <button onClick={() => {handleProtectedAction(() => setView('listing'), 'buyer'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">Browse Flats</button>
+            <button onClick={() => {handleProtectedAction(() => setView('post'), 'seller'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">List Property</button>
+            <button onClick={() => {setView('howItWorks'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">How It Works</button>
             
-            <div className="border-t border-gray-100 my-2"></div>
-            <button onClick={() => {setView('howItWorks'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-teal-700 font-medium hover:bg-teal-50 rounded-md">How It Works</button>
-            <button onClick={() => {setView('benefits'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-teal-700 font-medium hover:bg-teal-50 rounded-md">Benefits</button>
-            <button onClick={() => {setView('faq'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-teal-700 font-medium hover:bg-teal-50 rounded-md">FAQs</button>
-            
-            {isAdmin && <button onClick={() => {setView('admin'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-red-600 font-bold hover:bg-gray-100 rounded-md">Admin Dashboard</button>}
+            {!user ? (
+              <div className="pt-4 space-y-2 border-t mt-2">
+                <button 
+                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setShowAuthModal(true); setIsMenuOpen(false); }}
+                  className="block w-full text-center bg-teal-50 text-teal-700 py-2 rounded-md font-bold"
+                >
+                  Sign Up Buyer
+                </button>
+                <button 
+                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setShowAuthModal(true); setIsMenuOpen(false); }}
+                  className="block w-full text-center bg-teal-600 text-white py-2 rounded-md font-bold"
+                >
+                  Sign Up Seller
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleLogout} className="block w-full text-left px-3 py-2 text-red-600 font-medium">Logout</button>
+            )}
           </div>
         </div>
       )}
     </nav>
   );
 
+  const AuthModal = () => {
+    if (!showAuthModal) return null;
+
+    const handleAuthSubmit = (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const userData = {
+        name: formData.get('name') || 'User',
+        email: formData.get('email'),
+        type: authTargetRole
+      };
+      handleLoginSuccess(userData);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
+          <div className="bg-teal-600 px-6 py-4 flex justify-between items-center">
+            <h3 className="text-xl font-bold text-white">
+              {authMode === 'signup' ? `Sign Up as ${authTargetRole === 'buyer' ? 'Buyer' : 'Seller'}` : 'Login'}
+            </h3>
+            <button onClick={() => setShowAuthModal(false)} className="text-teal-100 hover:text-white">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <div className="p-6">
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              {authMode === 'signup' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input name="name" type="text" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="John Doe" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input name="phone" type="tel" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="+91 98765 43210" />
+                  </div>
+                </>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input name="email" type="email" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="john@example.com" />
+              </div>
+
+              {authMode === 'login' && (
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input name="password" type="password" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="••••••••" />
+                 </div>
+              )}
+
+              <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
+                {authMode === 'signup' ? 'Create Account' : 'Login'}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center border-t pt-4">
+              <p className="text-sm text-gray-600">
+                {authMode === 'signup' ? "Already have an account?" : "Don't have an account?"}
+              </p>
+              <button 
+                onClick={() => setAuthMode(authMode === 'signup' ? 'login' : 'signup')}
+                className="mt-2 text-teal-600 font-bold hover:underline"
+              >
+                {authMode === 'signup' ? 'Login Here' : 'Sign Up Here'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // SEO & AI-EO Component
   const SEOMetadata = () => {
     const schemaData = {
       "@context": "https://schema.org",
       "@type": "RealEstateAgent",
-      "name": "FlatConnecta",
+      "name": "FlatConnectio",
       "description": "Very low, flat brokerage. Rent a house without paying one month's rent as brokerage.",
       "priceRange": "₹12,499 - ₹16,999",
       "address": {
@@ -205,50 +342,59 @@ export default function App() {
 
   const Hero = () => (
     <>
-      <div className="relative bg-teal-600 overflow-hidden">
+      <div className="relative bg-white overflow-hidden">
         <SEOMetadata />
+        {/* Side-by-Side Layout for Desktop */}
         <div className="max-w-7xl mx-auto">
-          <div className="relative z-10 pb-8 bg-teal-600 sm:pb-16 md:pb-20 lg:max-w-2xl lg:w-full lg:pb-28 xl:pb-32">
-            <main className="mt-10 mx-auto max-w-7xl px-4 sm:mt-12 sm:px-6 md:mt-16 lg:mt-20 lg:px-8 xl:mt-28">
+          <div className="flex flex-col lg:flex-row">
+            
+            {/* Text Content Side */}
+            <div className="lg:w-1/2 py-12 px-4 sm:px-6 lg:py-24 lg:px-8 bg-white flex flex-col justify-center">
               <div className="sm:text-center lg:text-left">
-                <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
+                <h1 className="text-4xl tracking-tight font-extrabold text-teal-900 sm:text-5xl md:text-6xl">
                   Want to Rent a House Faster with Low Brokerage?
                 </h1>
-                <p className="mt-3 text-base text-teal-100 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
-                  Here at FlatConnecta, you will pay a flat and low brokerage. Instead of paying a standard brokerage equal to one month’s rent or a percentage cut, you pay a fixed low brokerage—suitable for anyone looking to rent a house with low brokerage. This means you keep more of your money for furnishing your home, strengthening your emergency fund, or reducing the financial pressure of shifting into a better house or locality that fits your lifestyle and social circle. If you’ve been searching for how to rent a house with low brokerage this is the best place!
+                <p className="mt-4 text-lg text-gray-600">
+                  Here at FlatConnectio, you will pay a flat and low brokerage. Instead of paying a standard brokerage equal to one month’s rent or a percentage cut, you pay a fixed low brokerage—suitable for anyone looking to rent a house with low brokerage. This means you keep more of your money for furnishing your home, strengthening your emergency fund, or reducing the financial pressure of shifting into a better house or locality.
                 </p>
-                
                 <div className="mt-8 sm:flex sm:justify-center lg:justify-start">
-                  <div className="rounded-md shadow">
-                    <button onClick={() => setView('listing')} className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-teal-700 bg-white hover:bg-gray-50 md:py-4 md:text-lg md:px-10">
-                      View Properties
-                    </button>
-                  </div>
+                  <button 
+                    onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')}
+                    className="w-full sm:w-auto flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-lg text-white bg-teal-600 hover:bg-teal-700 shadow-lg transition-transform transform hover:-translate-y-1"
+                  >
+                    View Properties
+                  </button>
                 </div>
               </div>
-            </main>
+            </div>
+
+            {/* Image Side */}
+            <div className="lg:w-1/2 relative h-64 sm:h-72 md:h-96 lg:h-auto">
+              <img
+                className="w-full h-full object-cover"
+                src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
+                alt="Modern apartment interior"
+              />
+              <div className="absolute inset-0 bg-teal-900 bg-opacity-20 mix-blend-multiply"></div>
+            </div>
           </div>
-        </div>
-        <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2 bg-gray-200">
-          <img
-            className="h-56 w-full object-cover sm:h-72 md:h-96 lg:w-full lg:h-full opacity-90"
-            src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
-            alt="Modern apartment interior"
-          />
         </div>
       </div>
 
       {/* Separated Owner Section */}
-      <div className="bg-teal-800 py-12">
+      <div className="bg-teal-800 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between">
-          <div className="mb-6 md:mb-0 text-center md:text-left">
-            <h2 className="text-2xl font-bold text-white mb-2">For Owners (Sellers of Rental Space)</h2>
-            <p className="text-teal-100 text-lg">
+          <div className="mb-8 md:mb-0 text-center md:text-left max-w-2xl">
+            <h2 className="text-3xl font-bold text-white mb-4">For Owners (Sellers of Rental Space)</h2>
+            <p className="text-teal-100 text-xl leading-relaxed">
               Owners can rent out their house for free with no hidden charges. List your house and we handle everything else.
             </p>
           </div>
           <div>
-            <button onClick={() => setView('post')} className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-teal-900 bg-teal-100 hover:bg-teal-200 md:py-4 md:text-lg md:px-10 shadow-lg">
+            <button 
+              onClick={() => handleProtectedAction(() => setView('post'), 'seller')}
+              className="inline-flex items-center justify-center px-10 py-4 border border-transparent text-lg font-bold rounded-lg text-teal-900 bg-white hover:bg-teal-50 shadow-xl transition-transform transform hover:-translate-y-1"
+            >
                List Property
             </button>
           </div>
@@ -398,7 +544,7 @@ export default function App() {
     <div className="bg-teal-50 min-h-screen py-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-extrabold text-teal-900">Why Choose FlatConnecta?</h2>
+          <h2 className="text-4xl font-extrabold text-teal-900">Why Choose FlatConnectio?</h2>
           <p className="mt-4 text-xl text-gray-600">Real benefits over the traditional model.</p>
         </div>
 
@@ -541,6 +687,12 @@ export default function App() {
                       <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{property.city}</span>
                       <span className="text-xs font-bold text-green-600">Brokerage: {formatCurrency(getBrokerage(property.rent))}</span>
                   </div>
+                  <button 
+                      onClick={() => { setSelectedProperty(property); setView('details'); }}
+                      className="w-full mt-4 bg-gray-900 text-white py-2 rounded-md hover:bg-gray-800 transition flex justify-center items-center"
+                    >
+                      View Details <ArrowRight className="ml-2 h-4 w-4" />
+                    </button>
                 </div>
               </div>
             ))}
@@ -666,7 +818,7 @@ export default function App() {
     const [sqft, setSqft] = useState('');
     const [description, setDescription] = useState('');
     const [videoFile, setVideoFile] = useState(null);
-  const [photoFiles, setPhotoFiles] = useState(null);
+    const [photoFiles, setPhotoFiles] = useState(null);
     
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -716,7 +868,7 @@ export default function App() {
                  </p>
                </div>
 
-              {/* Photo Upload Section (New) */}
+              {/* Photo Upload Section */}
               <div className="bg-teal-50 border border-teal-200 p-4 rounded-lg">
                 <h3 className="text-teal-800 font-bold flex items-center mb-2">
                   <ImageIcon className="h-5 w-5 mr-2" /> Upload Property Photos
@@ -993,7 +1145,7 @@ export default function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
-            <h3 className="text-lg font-bold mb-2 flex items-center"><Building className="mr-2" /> FlatConnecta</h3>
+            <h3 className="text-lg font-bold mb-2 flex items-center"><Building className="mr-2" /> FlatConnectio</h3>
             <p className="text-gray-400 text-sm">Requirement-locked matchmaking with fixed brokerage.</p>
           </div>
           <div>
@@ -1005,8 +1157,8 @@ export default function App() {
             <h3 className="text-lg font-bold mb-2">Quick Links</h3>
             <ul className="text-gray-400 text-sm space-y-1">
               <li className="cursor-pointer hover:text-white" onClick={() => setView('home')}>Home</li>
-              <li className="cursor-pointer hover:text-white" onClick={() => setView('listing')}>Browse Flats</li>
-              <li className="cursor-pointer hover:text-white" onClick={() => setView('post')}>List Property</li>
+              <li className="cursor-pointer hover:text-white" onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')}>Browse Flats</li>
+              <li className="cursor-pointer hover:text-white" onClick={() => handleProtectedAction(() => setView('post'), 'seller')}>List Property</li>
               <li className="cursor-pointer hover:text-white" onClick={() => setView('howItWorks')}>How It Works</li>
               <li className="cursor-pointer text-gray-500 hover:text-white mt-2" onClick={() => { setIsAdmin(!isAdmin); setView('admin'); }}>
                 {isAdmin ? "Logout Admin" : "Admin Login"}
@@ -1015,7 +1167,7 @@ export default function App() {
           </div>
         </div>
         <div className="border-t border-gray-700 mt-8 pt-4 text-center text-sm text-gray-500">
-          FlatConnecta. All rights reserved.
+          FlatConnectio. All rights reserved.
         </div>
       </div>
     </footer>
@@ -1025,6 +1177,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       <Navbar />
+      <AuthModal />
       
       <div className="flex-grow">
         {view === 'home' && (
@@ -1044,14 +1197,14 @@ export default function App() {
                         <p className="text-teal-600 font-bold mt-1">{formatCurrency(property.rent)} <span className="text-xs text-gray-500 font-normal">/month</span></p>
                         <div className="mt-2 flex justify-between items-center">
                             <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{property.city}</span>
-                            <span className="text-xs font-bold text-green-600">Fee: {formatCurrency(getBrokerage(property.rent))}</span>
+                            <span className="text-xs font-bold text-green-600">Brokerage: {formatCurrency(getBrokerage(property.rent))}</span>
                         </div>
                      </div>
                    </div>
                  ))}
                </div>
                <div className="text-center mt-8">
-                  <button onClick={() => setView('listing')} className="text-teal-600 font-semibold hover:text-teal-800 flex items-center justify-center w-full">
+                  <button onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')} className="text-teal-600 font-semibold hover:text-teal-800 flex items-center justify-center w-full">
                     View All Properties <ArrowRight className="ml-1 h-4 w-4" />
                   </button>
                </div>
