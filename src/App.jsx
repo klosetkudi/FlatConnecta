@@ -421,7 +421,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-gray-800 overflow-hidden shadow-lg rounded-lg border border-teal-500">
+          <div className="bg-gray-800 overflow-hidden shadow-lg rounded-lg border border-gray-700">
             <div className="px-4 py-8 sm:p-6 text-center">
               <h3 className="text-lg font-medium text-gray-300">Rent above ₹50,000</h3>
               <div className="mt-4 flex justify-center items-baseline">
@@ -795,7 +795,7 @@ export default function App() {
                 onClick={() => { setShowInquiryModal(true); setInquirySent(false); }}
                 className="w-full bg-teal-600 text-white py-4 rounded-lg font-bold hover:bg-teal-700 transition flex justify-center items-center shadow-lg"
               >
-                <Phone className="h-5 w-5 mr-2" /> Request Consultation
+                <Phone className="h-5 w-5 mr-2" /> Request Call for this Property
               </button>
               
               <p className="text-xs text-gray-500 text-center mt-4">
@@ -1091,7 +1091,7 @@ export default function App() {
               <div className="sm:flex sm:items-start">
                 <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                   <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                    Request Consultation & Visit
+                    Request Call for {selectedProperty.title}
                   </h3>
                   
                   {!inquirySent ? (
@@ -1115,7 +1115,7 @@ export default function App() {
                         <input type="email" placeholder="Email ID" className="w-full p-2 border rounded" required />
                         <textarea placeholder="Any specific requirements or questions?" className="w-full p-2 border rounded" rows="2"></textarea>
                         <button type="submit" className="w-full bg-teal-600 text-white p-3 rounded font-bold hover:bg-teal-700">
-                          Request Consultation
+                          Send Request
                         </button>
                       </form>
                     </>
