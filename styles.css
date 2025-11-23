@@ -1,0 +1,104 @@
+/* ===========================
+   src/styles.css
+   Tailwind-ready file (recommended)
+   =========================== */
+
+/* Optional: load Inter from Google Fonts (works in dev & prod).
+   You may move this to index.html <link> if you prefer. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+/* Tailwind layers - required when using Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------
+   Small global adjustments
+   --------------------------- */
+:root{
+  --brand-teal: #0d9488;
+  --muted: #6b7280;
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --max-width: 1280px;
+}
+
+/* Base resets / sensible defaults */
+* { box-sizing: border-box; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+html, body, #root { height: 100%; margin: 0; padding: 0; background: var(--bg); }
+body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color: #111827; -webkit-font-smoothing:antialiased; }
+
+/* Images */
+img { max-width: 100%; display: block; height: auto; }
+
+/* Buttons - accessible baseline */
+button {
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Link baseline */
+a { color: inherit; text-decoration: none; }
+
+/* Container helper (for non-Tailwind fallback use) */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Minimal accessible focus outline */
+:focus { outline: 3px solid rgba(13,148,136,0.18); outline-offset: 2px; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: .75rem;
+  box-shadow: 0 6px 20px rgba(2,6,23,0.06);
+  border: 1px solid rgba(15,23,42,0.04);
+}
+
+/* Utility that imitates a simple sticky header gap for pages without Tailwind */
+.sticky-top { position: sticky; top: 0; z-index: 50; }
+
+/* Tiny typographic helpers */
+.h1 { font-size: clamp(1.625rem, 1.5rem + 1.2vw, 2.25rem); line-height: 1.05; font-weight: 800; }
+.h2 { font-size: clamp(1.25rem, 1rem + 1vw, 1.5rem); font-weight: 700; }
+.lead { font-size: 1.0625rem; color: var(--muted); }
+
+/* Form input baseline */
+input[type="text"], input[type="email"], input[type="tel"], select, textarea {
+  width: 100%;
+  padding: .6rem .75rem;
+  border-radius: .5rem;
+  border: 1px solid rgba(15,23,42,0.08);
+  background: #fff;
+  font-size: .95rem;
+  transition: box-shadow .12s ease, border-color .12s ease;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--brand-teal); box-shadow: 0 6px 20px rgba(13,148,136,0.06); outline: none; }
+
+/* File input cosmetics (modern browsers) */
+input[type="file"]::-webkit-file-upload-button { padding: .5rem .8rem; border-radius: .5rem; background: rgba(13,148,136,0.08); border: 1px solid rgba(13,148,136,0.12); cursor: pointer; }
+
+/* Responsive utilities used by the markup if Tailwind absent */
+.row { display: flex; flex-wrap: wrap; gap: 1rem; }
+.col-1 { flex: 1 1 100%; }
+@media(min-width:768px) {
+  .col-2 { flex: 1 1 calc(50% - 1rem); }
+  .col-3 { flex: 1 1 calc(33.333% - 1rem); }
+}
+
+/* Small helper for modal backdrop */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(17,24,39,0.6); z-index: 60;
+}
+
+/* Footer baseline */
+.site-footer { padding: 3rem 0; background: #111827; color: rgba(255,255,255,0.9); }
+
+/* End of file */
