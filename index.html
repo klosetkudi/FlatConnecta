@@ -4,9 +4,46 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FlatConnecta</title>
+
+    <!-- 1) Tailwind CDN (must be first so your utility classes work immediately) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 2) Tiny Tailwind config override to ensure teal shades match the design -->
+    <script>
+      /* small Tailwind theme extend for consistent teal shades */
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              teal: {
+                50: '#f0fdfa',
+                100: '#ccfbf1',
+                200: '#99f6e4',
+                300: '#5eead4',
+                400: '#2dd4bf',
+                500: '#14b8a6',
+                600: '#0d9488',
+                700: '#0f766e',
+                800: '#115e59',
+                900: '#134e4a'
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial']
+            }
+          }
+        }
+      };
+    </script>
+
+    <!-- 3) Optional: a small CSS reset or favicon links can go here -->
+    <!-- If you later add a global stylesheet served from public, link it here. -->
   </head>
-  <body>
+
+  <body class="antialiased bg-gray-50">
     <div id="root"></div>
+
+    <!-- 4) Your React entry -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
