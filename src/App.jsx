@@ -104,7 +104,7 @@ export default function App() {
   const [inquirySent, setInquirySent] = useState(false);
   
   // Auth State
-  const [user, setUser] = useState(null); // { name, type: 'buyer' | 'seller' }
+  const [user, setUser] = useState(null); // { name, email, phone, type: 'buyer' | 'seller' }
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('signup'); // 'signup' or 'login'
   const [authTargetRole, setAuthTargetRole] = useState('buyer'); // 'buyer' or 'seller'
@@ -237,9 +237,11 @@ export default function App() {
     const handleAuthSubmit = (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
+      // Simulate fetching user data from backend or using the entered data
       const userData = {
         name: formData.get('name') || 'User',
         email: formData.get('email'),
+        phone: formData.get('phone'), // Captured phone number
         type: authTargetRole
       };
       handleLoginSuccess(userData);
@@ -278,10 +280,15 @@ export default function App() {
               </div>
 
               {authMode === 'login' && (
-                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input name="password" type="password" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="••••••••" />
-                 </div>
+                 <>
+                   {/* Simulate Login - In real app, would fetch profile including name/phone */}
+                   <input type="hidden" name="name" value="Existing User" />
+                   <input type="hidden" name="phone" value="+91 99999 99999" />
+                   <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                      <input name="password" type="password" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="••••••••" />
+                   </div>
+                 </>
               )}
 
               <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
@@ -792,7 +799,7 @@ export default function App() {
               </div>
 
               <button 
-                onClick={() => { setShowInquiryModal(true); setInquirySent(false); }}
+                onClick={() => handleProtectedAction(() => { setShowInquiryModal(true); setInquirySent(false); }, 'buyer')}
                 className="w-full bg-teal-600 text-white py-4 rounded-lg font-bold hover:bg-teal-700 transition flex justify-center items-center shadow-lg"
               >
                 <Phone className="h-5 w-5 mr-2" /> Request Call for this Property
@@ -1097,22 +1104,43 @@ export default function App() {
                   {!inquirySent ? (
                     <>
                       <div className="mt-4 bg-gray-50 p-4 rounded-md">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">How it works</h4>
-                         <p className="text-sm text-gray-600 mb-2">
-                           1. Submit this form.<br/>
-                           2. We call you to lock your requirements (budget, non-negotiables).<br/>
-                           3. If this flat matches your locked needs, we schedule a visit.
-                         </p>
-                        <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between font-bold text-gray-900 text-sm">
+                        <div className="flex justify-between font-bold text-gray-900 text-sm">
                            <span>Brokerage (Payable on Finalization):</span>
                            <span>{formatCurrency(brokerage)}</span>
                         </div>
                       </div>
 
                       <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); setInquirySent(true); }}>
-                        <input type="text" placeholder="Your Name" className="w-full p-2 border rounded" required />
-                        <input type="tel" placeholder="Mobile Number" className="w-full p-2 border rounded" required />
-                        <input type="email" placeholder="Email ID" className="w-full p-2 border rounded" required />
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Your Name</label>
+                            <input 
+                              type="text" 
+                              value={user?.name || ''} 
+                              readOnly 
+                              className="w-full p-2 border rounded bg-gray-100 text-gray-600 cursor-not-allowed" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Mobile Number</label>
+                            <input 
+                              type="tel" 
+                              value={user?.phone || ''} 
+                              readOnly 
+                              className="w-full p-2 border rounded bg-gray-100 text-gray-600 cursor-not-allowed" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Email ID</label>
+                            <input 
+                              type="email" 
+                              value={user?.email || ''} 
+                              readOnly 
+                              className="w-full p-2 border rounded bg-gray-100 text-gray-600 cursor-not-allowed" 
+                            />
+                          </div>
+                        </div>
+                        
                         <textarea placeholder="Any specific requirements or questions?" className="w-full p-2 border rounded" rows="2"></textarea>
                         <button type="submit" className="w-full bg-teal-600 text-white p-3 rounded font-bold hover:bg-teal-700">
                           Send Request
