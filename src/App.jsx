@@ -33,11 +33,12 @@ import {
   thumbsUp,
   Image as ImageIcon,
   LogOut,
-  User
+  User,
+  Smartphone
 } from 'lucide-react';
 
-// --- Mock Data ---
-const INITIAL_PROPERTIES = [
+// --- Mock Data (Used for Admin Approval simulation, but Active list starts empty) ---
+const MOCK_PENDING_DATA = [
   {
     id: 1,
     title: "Luxury 3BHK in Bandra West",
@@ -50,34 +51,6 @@ const INITIAL_PROPERTIES = [
     image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     type: "Apartment",
     amenities: ["Gym", "Pool", "Parking", "Security"],
-    video: "mock_video_url.mp4"
-  },
-  {
-    id: 2,
-    title: "Cozy 1BHK in Koramangala",
-    location: "Koramangala, Bangalore",
-    city: "Bangalore",
-    rent: 25000,
-    bhk: 1,
-    bathrooms: 1,
-    sqft: 650,
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-    type: "Apartment",
-    amenities: ["WiFi", "Power Backup"],
-    video: "mock_video_url.mp4"
-  },
-  {
-    id: 3,
-    title: "Spacious 2BHK near Cyber Hub",
-    location: "DLF Phase 3, Gurgaon",
-    city: "Gurgaon",
-    rent: 48000,
-    bhk: 2,
-    bathrooms: 2,
-    sqft: 1100,
-    image: "https://images.unsplash.com/photo-1502005229766-3a6260cd5125?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-    type: "Floor",
-    amenities: ["Park View", "Metro Nearby", "Gated Society"],
     video: "mock_video_url.mp4"
   }
 ];
@@ -96,7 +69,7 @@ const formatCurrency = (amount) => {
 };
 
 export default function App() {
-  const [view, setView] = useState('home'); // home, listing, details, post, admin, howItWorks, benefits, faq
+  const [view, setView] = useState('home'); 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [filters, setFilters] = useState({ city: 'All', bhk: 'All' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -108,20 +81,30 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('signup'); // 'signup' or 'login'
   const [authTargetRole, setAuthTargetRole] = useState('buyer'); // 'buyer' or 'seller'
-  const [pendingAction, setPendingAction] = useState(null); // function to run after login
+  const [pendingAction, setPendingAction] = useState(null); 
   
-  // Data States
-  const [activeProperties, setActiveProperties] = useState(INITIAL_PROPERTIES);
-  const [pendingProperties, setPendingProperties] = useState([]);
+  // OTP State
+  const [otpSent, setOtpSent] = useState(false);
+  const [signupData, setSignupData] = useState(null); // Temp store for signup details before OTP
+
+  // Data States - Active Properties start EMPTY as requested
+  const [activeProperties, setActiveProperties] = useState([]); 
+  const [pendingProperties, setPendingProperties] = useState([]); // Empty initially, user adds via form
   const [isAdmin, setIsAdmin] = useState(false);
 
   const handleProtectedAction = (action, role) => {
     if (user) {
+      // If user is logged in but trying to access a feature not for their role
+      if (user.type !== role) {
+        alert(`This feature is only available for ${role}s. You are logged in as a ${user.type}.`);
+        return;
+      }
       action();
     } else {
       setPendingAction(() => action);
       setAuthTargetRole(role);
       setAuthMode('signup');
+      setOtpSent(false); // Reset OTP state
       setShowAuthModal(true);
     }
   };
@@ -129,6 +112,15 @@ export default function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setShowAuthModal(false);
+    setOtpSent(false);
+    setSignupData(null);
+    
+    // Role-based redirection on login
+    if (userData.type === 'seller') {
+       // If logging in as seller, maybe go to dashboard or post property? 
+       // Staying on home but UI updates to show seller stuff is fine.
+    }
+
     if (pendingAction) {
       pendingAction();
       setPendingAction(null);
@@ -156,16 +148,25 @@ export default function App() {
           {/* Desktop Menu - Sequential Row */}
           <div className="hidden xl:flex items-center space-x-1">
             <button onClick={() => setView('home')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'home' ? 'text-teal-600' : ''}`}>Home</button>
-            <button onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'listing' ? 'text-teal-600' : ''}`}>Browse Flats</button>
-            <button onClick={() => handleProtectedAction(() => setView('post'), 'seller')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'post' ? 'text-teal-600' : ''}`}>List Property</button>
+            
+            {/* Buyer Links - Hide if Seller */}
+            {(!user || user.type === 'buyer') && (
+              <button onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'listing' ? 'text-teal-600' : ''}`}>Browse Flats</button>
+            )}
+
+            {/* Seller Links - Hide if Buyer */}
+            {(!user || user.type === 'seller') && (
+              <button onClick={() => handleProtectedAction(() => setView('post'), 'seller')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'post' ? 'text-teal-600' : ''}`}>List Property</button>
+            )}
+
             <button onClick={() => setView('howItWorks')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'howItWorks' ? 'text-teal-600' : ''}`}>How It Works</button>
             <button onClick={() => setView('benefits')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'benefits' ? 'text-teal-600' : ''}`}>Benefits</button>
             <button onClick={() => setView('faq')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'faq' ? 'text-teal-600' : ''}`}>FAQs</button>
 
             {user ? (
               <div className="flex items-center ml-4 space-x-3">
-                <span className="text-sm text-gray-600 font-medium flex items-center bg-gray-100 px-3 py-1 rounded-full">
-                  <User className="h-4 w-4 mr-1" /> {user.name}
+                <span className="text-sm text-gray-600 font-medium flex items-center bg-gray-100 px-3 py-1 rounded-full capitalize">
+                  <User className="h-4 w-4 mr-1" /> {user.name} ({user.type})
                 </span>
                 <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center">
                   <LogOut className="h-4 w-4 mr-1" /> Logout
@@ -174,13 +175,13 @@ export default function App() {
             ) : (
               <div className="flex items-center ml-4 space-x-3">
                 <button 
-                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setShowAuthModal(true); }}
+                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); }}
                   className="bg-teal-50 text-teal-700 border border-teal-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-100 transition"
                 >
                   Sign Up Buyer
                 </button>
                 <button 
-                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setShowAuthModal(true); }}
+                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); }}
                   className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-700 transition shadow-md"
                 >
                   Sign Up Seller
@@ -203,20 +204,27 @@ export default function App() {
         <div className="xl:hidden bg-white border-t">
           <div className="px-4 pt-4 pb-4 space-y-2">
             <button onClick={() => {setView('home'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">Home</button>
-            <button onClick={() => {handleProtectedAction(() => setView('listing'), 'buyer'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">Browse Flats</button>
-            <button onClick={() => {handleProtectedAction(() => setView('post'), 'seller'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">List Property</button>
+            
+            {(!user || user.type === 'buyer') && (
+              <button onClick={() => {handleProtectedAction(() => setView('listing'), 'buyer'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">Browse Flats</button>
+            )}
+            
+            {(!user || user.type === 'seller') && (
+              <button onClick={() => {handleProtectedAction(() => setView('post'), 'seller'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">List Property</button>
+            )}
+            
             <button onClick={() => {setView('howItWorks'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">How It Works</button>
             
             {!user ? (
               <div className="pt-4 space-y-2 border-t mt-2">
                 <button 
-                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setShowAuthModal(true); setIsMenuOpen(false); }}
+                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); setIsMenuOpen(false); }}
                   className="block w-full text-center bg-teal-50 text-teal-700 py-2 rounded-md font-bold"
                 >
                   Sign Up Buyer
                 </button>
                 <button 
-                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setShowAuthModal(true); setIsMenuOpen(false); }}
+                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); setIsMenuOpen(false); }}
                   className="block w-full text-center bg-teal-600 text-white py-2 rounded-md font-bold"
                 >
                   Sign Up Seller
@@ -234,17 +242,37 @@ export default function App() {
   const AuthModal = () => {
     if (!showAuthModal) return null;
 
-    const handleAuthSubmit = (e) => {
+    // Step 1: Collect Info & Trigger OTP
+    const handleRequestOtp = (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
-      // Simulate fetching user data from backend or using the entered data
-      const userData = {
-        name: formData.get('name') || 'User',
+      const data = {
+        name: formData.get('name'),
+        phone: formData.get('phone'),
         email: formData.get('email'),
-        phone: formData.get('phone'), // Captured phone number
         type: authTargetRole
       };
-      handleLoginSuccess(userData);
+      setSignupData(data);
+      setOtpSent(true); // Move to Step 2
+    };
+
+    // Step 2: Verify OTP & Finalize
+    const handleVerifyOtp = (e) => {
+      e.preventDefault();
+      // Simulate OTP check (accept any input for demo)
+      handleLoginSuccess(signupData); 
+    };
+
+    // Login Handler (Simple simulation)
+    const handleLogin = (e) => {
+      e.preventDefault();
+      // Simulate existing user login
+      handleLoginSuccess({
+        name: 'Returning User',
+        phone: '+91 98765 43210',
+        email: 'user@example.com',
+        type: authTargetRole 
+      });
     };
 
     return (
@@ -260,9 +288,10 @@ export default function App() {
           </div>
           
           <div className="p-6">
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
-              {authMode === 'signup' && (
-                <>
+            {authMode === 'signup' ? (
+              !otpSent ? (
+                // SIGN UP STEP 1: DETAILS
+                <form onSubmit={handleRequestOtp} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                     <input name="name" type="text" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="John Doe" />
@@ -271,37 +300,51 @@ export default function App() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                     <input name="phone" type="tel" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="+91 98765 43210" />
                   </div>
-                </>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                <input name="email" type="email" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="john@example.com" />
-              </div>
-
-              {authMode === 'login' && (
-                 <>
-                   {/* Simulate Login - In real app, would fetch profile including name/phone */}
-                   <input type="hidden" name="name" value="Existing User" />
-                   <input type="hidden" name="phone" value="+91 99999 99999" />
-                   <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                      <input name="password" type="password" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="••••••••" />
-                   </div>
-                 </>
-              )}
-
-              <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
-                {authMode === 'signup' ? 'Create Account' : 'Login'}
-              </button>
-            </form>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input name="email" type="email" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="john@example.com" />
+                  </div>
+                  <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
+                    Get OTP
+                  </button>
+                </form>
+              ) : (
+                // SIGN UP STEP 2: OTP
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="bg-teal-50 p-3 rounded text-center text-sm text-teal-800 mb-4">
+                    OTP sent to {signupData?.phone}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
+                    <input name="otp" type="text" required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-center tracking-widest text-xl focus:ring-teal-500 focus:border-teal-500" placeholder="1 2 3 4" />
+                  </div>
+                  <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
+                    Verify & Complete Sign Up
+                  </button>
+                  <button type="button" onClick={() => setOtpSent(false)} className="w-full text-sm text-gray-500 hover:text-teal-600">
+                    Change Details
+                  </button>
+                </form>
+              )
+            ) : (
+              // LOGIN FORM (Simplified for demo)
+              <form onSubmit={handleLogin} className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input name="login_phone" type="tel" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="+91 98765 43210" />
+                 </div>
+                 <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
+                   Login with OTP
+                 </button>
+              </form>
+            )}
 
             <div className="mt-6 text-center border-t pt-4">
               <p className="text-sm text-gray-600">
                 {authMode === 'signup' ? "Already have an account?" : "Don't have an account?"}
               </p>
               <button 
-                onClick={() => setAuthMode(authMode === 'signup' ? 'login' : 'signup')}
+                onClick={() => { setAuthMode(authMode === 'signup' ? 'login' : 'signup'); setOtpSent(false); }}
                 className="mt-2 text-teal-600 font-bold hover:underline"
               >
                 {authMode === 'signup' ? 'Login Here' : 'Sign Up Here'}
@@ -353,58 +396,63 @@ export default function App() {
         <SEOMetadata />
         {/* Side-by-Side Layout for Desktop */}
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row">
-            
-            {/* Text Content Side */}
-            <div className="lg:w-1/2 py-12 px-4 sm:px-6 lg:py-24 lg:px-8 bg-white flex flex-col justify-center">
-              <div className="sm:text-center lg:text-left">
-                <h1 className="text-4xl tracking-tight font-extrabold text-teal-900 sm:text-5xl md:text-6xl">
-                  Want to Rent a House Faster with Low Brokerage?
-                </h1>
-                <p className="mt-4 text-lg text-gray-600">
-                  Here at FlatConnectio, you will pay a flat and low brokerage. Instead of paying a standard brokerage equal to one month’s rent or a percentage cut, you pay a fixed low brokerage—suitable for anyone looking to rent a house with low brokerage. This means you keep more of your money for furnishing your home, strengthening your emergency fund, or reducing the financial pressure of shifting into a better house or locality.
-                </p>
-                <div className="mt-8 sm:flex sm:justify-center lg:justify-start">
+          
+          {/* Logic for displaying Hero content based on role */}
+          {(!user || user.type === 'buyer') && (
+            <div className="flex flex-col lg:flex-row border-b border-gray-100">
+              {/* Buyer Content Side */}
+              <div className="lg:w-1/2 py-12 px-4 sm:px-6 lg:py-24 lg:px-8 bg-white flex flex-col justify-center">
+                <div className="sm:text-center lg:text-left">
+                  <h1 className="text-4xl tracking-tight font-extrabold text-teal-900 sm:text-5xl md:text-6xl">
+                    Want to Rent a House Faster with Low Brokerage?
+                  </h1>
+                  <p className="mt-4 text-lg text-gray-600">
+                    Here at FlatConnectio, you will pay a flat and low brokerage. Instead of paying a standard brokerage equal to one month’s rent or a percentage cut, you pay a fixed low brokerage—suitable for anyone looking to rent a house with low brokerage.
+                  </p>
+                  <div className="mt-8 sm:flex sm:justify-center lg:justify-start">
+                    <button 
+                      onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')}
+                      className="w-full sm:w-auto flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-lg text-white bg-teal-600 hover:bg-teal-700 shadow-lg transition-transform transform hover:-translate-y-1"
+                    >
+                      View Properties
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Image Side */}
+              <div className="lg:w-1/2 relative h-64 sm:h-72 md:h-96 lg:h-auto">
+                <img
+                  className="w-full h-full object-cover"
+                  src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
+                  alt="Modern apartment interior"
+                />
+                <div className="absolute inset-0 bg-teal-900 bg-opacity-20 mix-blend-multiply"></div>
+              </div>
+            </div>
+          )}
+
+          {/* Separated Owner Section - Hidden if User is Buyer */}
+          {(!user || user.type === 'seller') && (
+            <div className="bg-teal-800 py-16">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between">
+                <div className="mb-8 md:mb-0 text-center md:text-left max-w-2xl">
+                  <h2 className="text-3xl font-bold text-white mb-4">For Owners (Sellers of Rental Space)</h2>
+                  <p className="text-teal-100 text-xl leading-relaxed">
+                    Owners can rent out their house for free with no hidden charges. List your house and we handle everything else.
+                  </p>
+                </div>
+                <div>
                   <button 
-                    onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')}
-                    className="w-full sm:w-auto flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-lg text-white bg-teal-600 hover:bg-teal-700 shadow-lg transition-transform transform hover:-translate-y-1"
+                    onClick={() => handleProtectedAction(() => setView('post'), 'seller')}
+                    className="inline-flex items-center justify-center px-10 py-4 border border-transparent text-lg font-bold rounded-lg text-teal-900 bg-white hover:bg-teal-50 shadow-xl transition-transform transform hover:-translate-y-1"
                   >
-                    View Properties
+                     List Property
                   </button>
                 </div>
               </div>
             </div>
-
-            {/* Image Side */}
-            <div className="lg:w-1/2 relative h-64 sm:h-72 md:h-96 lg:h-auto">
-              <img
-                className="w-full h-full object-cover"
-                src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
-                alt="Modern apartment interior"
-              />
-              <div className="absolute inset-0 bg-teal-900 bg-opacity-20 mix-blend-multiply"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Separated Owner Section */}
-      <div className="bg-teal-800 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between">
-          <div className="mb-8 md:mb-0 text-center md:text-left max-w-2xl">
-            <h2 className="text-3xl font-bold text-white mb-4">For Owners (Sellers of Rental Space)</h2>
-            <p className="text-teal-100 text-xl leading-relaxed">
-              Owners can rent out their house for free with no hidden charges. List your house and we handle everything else.
-            </p>
-          </div>
-          <div>
-            <button 
-              onClick={() => handleProtectedAction(() => setView('post'), 'seller')}
-              className="inline-flex items-center justify-center px-10 py-4 border border-transparent text-lg font-bold rounded-lg text-teal-900 bg-white hover:bg-teal-50 shadow-xl transition-transform transform hover:-translate-y-1"
-            >
-               List Property
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </>
@@ -519,30 +567,34 @@ export default function App() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        <div className="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-teal-500">
-          <div className="flex items-center mb-6">
-            <div className="p-3 bg-teal-100 rounded-full mr-4">
-              <Users className="h-8 w-8 text-teal-700" />
+        {(!user || user.type === 'buyer') && (
+          <div className="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-teal-500">
+            <div className="flex items-center mb-6">
+              <div className="p-3 bg-teal-100 rounded-full mr-4">
+                <Users className="h-8 w-8 text-teal-700" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800">For Renters (Buyers)</h3>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800">For Renters (Buyers)</h3>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Your consultation call locks your actual requirements: locality, budget, layout, non-negotiables. This removes pointless site visits. Photos and video tours are available upfront so you screen houses without wasting weekends. Only houses that match your criteria move forward. You pay a flat, low brokerage—never one month’s rent, never percentage cuts.
+            </p>
           </div>
-          <p className="text-gray-600 text-lg leading-relaxed">
-            Your consultation call locks your actual requirements: locality, budget, layout, non-negotiables. This removes pointless site visits. Photos and video tours are available upfront so you screen houses without wasting weekends. Only houses that match your criteria move forward. You pay a flat, low brokerage—never one month’s rent, never percentage cuts.
-          </p>
-        </div>
+        )}
 
-        <div className="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-green-500">
-          <div className="flex items-center mb-6">
-            <div className="p-3 bg-green-100 rounded-full mr-4">
-               <Building className="h-8 w-8 text-green-700" />
+        {(!user || user.type === 'seller') && (
+          <div className="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-green-500">
+            <div className="flex items-center mb-6">
+              <div className="p-3 bg-green-100 rounded-full mr-4">
+                 <Building className="h-8 w-8 text-green-700" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800">For Owners (Sellers)</h3>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800">For Owners (Sellers)</h3>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Your consultation call fixes what you expect: rent range, tenant profile, restrictions, and non-negotiables. You don’t deal with random tenants who don’t fit. Only aligned, pre-screened renters reach you. <br/><br/>
+              <strong>No/ Zero brokerage for renting the house. Just list it for free and we will do the rest.</strong>
+            </p>
           </div>
-          <p className="text-gray-600 text-lg leading-relaxed">
-            Your consultation call fixes what you expect: rent range, tenant profile, restrictions, and non-negotiables. You don’t deal with random tenants who don’t fit. Only aligned, pre-screened renters reach you. <br/><br/>
-            <strong>No/ Zero brokerage for renting the house. Just list it for free and we will do the rest.</strong>
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -556,46 +608,50 @@ export default function App() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Renters Benefits */}
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-teal-100">
-            <h3 className="text-2xl font-bold text-teal-800 mb-6 flex items-center">
-              <Star className="h-6 w-6 mr-2 fill-current" /> Benefits for Renters
-            </h3>
-            <ul className="space-y-4">
-              {[
-                "You reduce your cost of moving.",
-                "You pay very low brokerage.",
-                "You stop wasting weekends on irrelevant houses and spend time earning more money and have good time with your loved ones.",
-                "You keep more money for setting up the home you want.",
-                "You avoid decision fatigue created by mismatched rentals."
-              ].map((item, idx) => (
-                <li key={idx} className="flex items-start">
-                  <CheckCircle className="h-6 w-6 text-teal-500 mr-3 flex-shrink-0" />
-                  <span className="text-gray-700 text-lg">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Renters Benefits - Hidden for Sellers */}
+          {(!user || user.type === 'buyer') && (
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-teal-100">
+              <h3 className="text-2xl font-bold text-teal-800 mb-6 flex items-center">
+                <Star className="h-6 w-6 mr-2 fill-current" /> Benefits for Renters
+              </h3>
+              <ul className="space-y-4">
+                {[
+                  "You reduce your cost of moving.",
+                  "You pay very low brokerage.",
+                  "You stop wasting weekends on irrelevant houses and spend time earning more money and have good time with your loved ones.",
+                  "You keep more money for setting up the home you want.",
+                  "You avoid decision fatigue created by mismatched rentals."
+                ].map((item, idx) => (
+                  <li key={idx} className="flex items-start">
+                    <CheckCircle className="h-6 w-6 text-teal-500 mr-3 flex-shrink-0" />
+                    <span className="text-gray-700 text-lg">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-          {/* Owners Benefits */}
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-green-100">
-            <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
-              <ShieldCheck className="h-6 w-6 mr-2" /> Benefits for Owners
-            </h3>
-            <ul className="space-y-4">
-              {[
-                "You avoid random tenants who don’t meet your expectations.",
-                "You spend zero time screening.",
-                "You reduce vacancy periods by meeting aligned tenants faster.",
-                "No brokerage for selling the house i.e. completely free."
-              ].map((item, idx) => (
-                <li key={idx} className="flex items-start">
-                  <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
-                  <span className="text-gray-700 text-lg">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Owners Benefits - Hidden for Buyers */}
+          {(!user || user.type === 'seller') && (
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-green-100">
+              <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
+                <ShieldCheck className="h-6 w-6 mr-2" /> Benefits for Owners
+              </h3>
+              <ul className="space-y-4">
+                {[
+                  "You avoid random tenants who don’t meet your expectations.",
+                  "You spend zero time screening.",
+                  "You reduce vacancy periods by meeting aligned tenants faster.",
+                  "No brokerage for selling the house i.e. completely free."
+                ].map((item, idx) => (
+                  <li key={idx} className="flex items-start">
+                    <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                    <span className="text-gray-700 text-lg">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -630,6 +686,9 @@ export default function App() {
   );
 
   const Listings = () => {
+    // Only Buyers should see listings
+    if (user && user.type === 'seller') return <div className="py-20 text-center text-xl text-gray-600">Sellers do not browse properties. Please use "List Property".</div>;
+
     const filteredProps = activeProperties.filter(p => {
       const matchesCity = filters.city === 'All' || p.city === filters.city;
       const matchesBHK = filters.bhk === 'All' || p.bhk === parseInt(filters.bhk);
@@ -669,8 +728,10 @@ export default function App() {
         </div>
 
         {filteredProps.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-gray-500 text-lg">No properties found matching your criteria.</p>
+          <div className="text-center py-20 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+            <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900">No properties listed yet</h3>
+            <p className="text-gray-500 mt-1">New listings will appear here once approved by our team.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
