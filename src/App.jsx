@@ -438,7 +438,7 @@ export default function App() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between">
                 <div className="mb-8 md:mb-0 text-center md:text-left max-w-2xl">
                   <h2 className="text-3xl font-bold text-white mb-4">For Owners (Sellers of Rental Space)</h2>
-                  <p className="text-teal-100 text-xl leading-relaxed">
+                  <p className="text-white font-bold text-xl leading-relaxed">
                     Owners can rent out their house for free with no hidden charges. List your house and we handle everything else.
                   </p>
                 </div>
@@ -967,7 +967,7 @@ export default function App() {
                 </h3>
                 <p className="text-sm text-orange-700 mb-4">
                   To ensure transparency, you must upload a clear walkthrough video of the flat. 
-                  Show all rooms, the kitchen, and the view from the window.
+                  Show all rooms, the kitchen.
                 </p>
                 <input 
                   type="file" 
@@ -1239,8 +1239,7 @@ export default function App() {
           </div>
           <div>
             <h3 className="text-lg font-bold mb-2">Contact</h3>
-            <p className="text-gray-400 text-sm">support@flatconnect.in</p>
-            <p className="text-gray-400 text-sm">+91 98765 43210</p>
+            <p className="text-gray-400 text-sm">flatconnectio@gmail.com</p>
           </div>
           <div>
             <h3 className="text-lg font-bold mb-2">Quick Links</h3>
@@ -1272,7 +1271,7 @@ export default function App() {
         {view === 'home' && (
           <>
             <Hero />
-            <BrokerageInfo />
+            {(!user || user.type !== 'seller') && <BrokerageInfo />}
             <ValueProposition />
             <div className="max-w-7xl mx-auto px-4 py-8">
                <h2 className="text-2xl font-bold text-gray-900 mb-6">Featured Listings</h2>
