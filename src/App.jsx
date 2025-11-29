@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { useUser, useAuth, SignIn, SignUp } from '@clerk/clerk-react';
 import { 
   Search, 
   Home, 
@@ -69,6 +69,9 @@ const formatCurrency = (amount) => {
 };
 
 export default function App() {
+  const { user: clerkUser, isLoaded: userLoaded } = useUser();
+  const { signOut } = useAuth();
+  
   const [view, setView] = useState('home'); 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [filters, setFilters] = useState({ city: 'All', bhk: 'All' });
@@ -76,21 +79,147 @@ export default function App() {
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [inquirySent, setInquirySent] = useState(false);
   
-  // Auth State
-  const [user, setUser] = useState(null); // { name, email, phone, type: 'buyer' | 'seller' }
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('signup'); // 'signup' or 'login'
-  const [authTargetRole, setAuthTargetRole] = useState('buyer'); // 'buyer' or 'seller'
-  const [pendingAction, setPendingAction] = useState(null); 
-  
-  // OTP State
-  const [otpSent, setOtpSent] = useState(false);
-  const [signupData, setSignupData] = useState(null); // Temp store for signup details before OTP
+  // Auth State - using Clerk for auth, but tracking user type (buyer/seller) in metadata
+  // Persist modal state in sessionStorage to survive OAuth redirects
+  const [showAuthModal, setShowAuthModal] = useState(() => {
+    return sessionStorage.getItem('showAuthModal') === 'true';
+  });
+  const [authMode, setAuthMode] = useState(() => {
+    return sessionStorage.getItem('authMode') || 'signup';
+  });
+  const [authTargetRole, setAuthTargetRole] = useState(() => {
+    return sessionStorage.getItem('authTargetRole') || 'buyer';
+  });
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // Sync modal state to sessionStorage
+  useEffect(() => {
+    if (showAuthModal) {
+      sessionStorage.setItem('showAuthModal', 'true');
+      sessionStorage.setItem('authMode', authMode);
+      sessionStorage.setItem('authTargetRole', authTargetRole);
+    } else {
+      sessionStorage.removeItem('showAuthModal');
+      sessionStorage.removeItem('authMode');
+      sessionStorage.removeItem('authTargetRole');
+    }
+  }, [showAuthModal, authMode, authTargetRole]); 
 
   // Data States - Active Properties start EMPTY as requested
   const [activeProperties, setActiveProperties] = useState([]); 
   const [pendingProperties, setPendingProperties] = useState([]); // Empty initially, user adds via form
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Derive user object from Clerk user and metadata
+  // Check both publicMetadata and localStorage for user type
+  const getUserType = () => {
+    if (clerkUser?.publicMetadata?.userType) {
+      return clerkUser.publicMetadata.userType;
+    }
+    // Fallback to localStorage if metadata not set yet
+    const storedType = localStorage.getItem(`userType_${clerkUser?.id}`);
+    return storedType || 'buyer';
+  };
+
+  const user = clerkUser ? {
+    id: clerkUser.id,
+    name: clerkUser.fullName || clerkUser.firstName || 'User',
+    email: clerkUser.primaryEmailAddress?.emailAddress || '',
+    phone: clerkUser.primaryPhoneNumber?.phoneNumber || '',
+    type: getUserType()
+  } : null;
+
+  // Update user metadata when user signs up and we have a target role
+  useEffect(() => {
+    const updateUserMetadata = async () => {
+      if (clerkUser && authTargetRole && !clerkUser.publicMetadata?.userType) {
+        try {
+          // Store in localStorage as fallback
+          localStorage.setItem(`userType_${clerkUser.id}`, authTargetRole);
+          
+          // Try to update Clerk metadata (requires backend API for publicMetadata)
+          // For now, we'll use localStorage and you can set up backend API later
+          // await clerkUser.update({ publicMetadata: { userType: authTargetRole } });
+        } catch (err) {
+          console.error('Error updating user metadata:', err);
+        }
+      }
+    };
+
+    if (userLoaded && clerkUser) {
+      updateUserMetadata();
+    }
+  }, [clerkUser, authTargetRole, userLoaded]);
+
+  // Handle authentication completion - close modal and execute pending actions
+  useEffect(() => {
+    if (userLoaded && clerkUser) {
+      // User just signed in/up, close modal and execute pending action
+      if (showAuthModal) {
+        setShowAuthModal(false);
+      }
+      if (pendingAction) {
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          pendingAction();
+          setPendingAction(null);
+        }, 100);
+      }
+    }
+  }, [userLoaded, clerkUser, showAuthModal, pendingAction]);
+
+  // Reopen modal if user returns from OAuth and modal was open
+  useEffect(() => {
+    if (userLoaded && !clerkUser) {
+      // Check if we were in the middle of auth flow (OAuth callback)
+      const hash = window.location.hash;
+      if (hash.includes('/oauth') || hash.includes('/sso-callback') || hash.includes('/verify') || hash.includes('/sign-up') || hash.includes('/sign-in')) {
+        // Reopen modal if it was open before OAuth redirect
+        if (sessionStorage.getItem('showAuthModal') === 'true') {
+          setShowAuthModal(true);
+          setAuthMode(sessionStorage.getItem('authMode') || 'signup');
+          setAuthTargetRole(sessionStorage.getItem('authTargetRole') || 'buyer');
+        }
+      }
+    }
+  }, [userLoaded, clerkUser]);
+
+  // Listen for hash changes to handle OAuth flow and close modal when auth completes
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      
+      // Don't close modal if we're in the middle of OAuth flow
+      if (hash.includes('/oauth') || hash.includes('/sso-callback') || hash.includes('/verify')) {
+        // Keep modal open and ensure it's set in sessionStorage
+        if (!showAuthModal) {
+          setShowAuthModal(true);
+        }
+        return;
+      }
+      
+      // If user is authenticated and not in OAuth flow, close modal
+      if (userLoaded && clerkUser && showAuthModal) {
+        // Wait a bit for everything to settle
+        const timer = setTimeout(() => {
+          setShowAuthModal(false);
+          // Clean up hash if it's a Clerk route
+          if (hash.includes('/sign-in') || hash.includes('/sign-up') || hash.includes('/continue')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Check on mount
+    handleHashChange();
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [userLoaded, clerkUser, showAuthModal]);
 
   const handleProtectedAction = (action, role) => {
     if (user) {
@@ -103,45 +232,28 @@ export default function App() {
       setPendingAction(() => action);
       setAuthTargetRole(role);
       setAuthMode('signup');
-      setOtpSent(false);
       setShowAuthModal(true);
     }
   };
 
-  // Supabase-integrated login success handler
-  const handleLoginSuccess = async (userData) => {
-    setUser(userData);
-    setShowAuthModal(false);
-    setOtpSent(false);
-    setSignupData(null);
+  const handleLogout = async () => {
+    await signOut();
+    setView('home');
+  };
 
-    try {
-      const tableName = userData.type === 'buyer' ? 'buyers' : 'sellers';
-
-      const { error } = await supabase
-        .from(tableName)
-        .insert({
-          name: userData.name,
-          email: userData.email,
-          mobile: userData.phone
-        });
-
-      if (error) {
-        console.error('Supabase insert error:', error);
-      }
-    } catch (err) {
-      console.error('Unexpected Supabase error:', err);
+  // Handle after Clerk sign-in/sign-up
+  const handleAuthComplete = () => {
+    // Store user type in localStorage
+    if (clerkUser && authTargetRole) {
+      localStorage.setItem(`userType_${clerkUser.id}`, authTargetRole);
     }
-
+    
+    setShowAuthModal(false);
+    
     if (pendingAction) {
       pendingAction();
       setPendingAction(null);
     }
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setView('home');
   };
 
   const Navbar = () => (
@@ -169,31 +281,31 @@ export default function App() {
             <button onClick={() => setView('benefits')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'benefits' ? 'text-teal-600' : ''}`}>Benefits</button>
             <button onClick={() => setView('faq')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'faq' ? 'text-teal-600' : ''}`}>FAQs</button>
 
-            {user ? (
+            {userLoaded && clerkUser ? (
               <div className="flex items-center ml-4 space-x-3">
                 <span className="text-sm text-gray-600 font-medium flex items-center bg-gray-100 px-3 py-1 rounded-full capitalize">
-                  <User className="h-4 w-4 mr-1" /> {user.name} ({user.type})
+                  <User className="h-4 w-4 mr-1" /> {user?.name || 'User'} ({user?.type || 'buyer'})
                 </span>
                 <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center">
                   <LogOut className="h-4 w-4 mr-1" /> Logout
                 </button>
               </div>
-            ) : (
+            ) : userLoaded && !clerkUser ? (
               <div className="flex items-center ml-4 space-x-3">
                 <button 
-                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); }}
+                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setShowAuthModal(true); }}
                   className="bg-teal-50 text-teal-700 border border-teal-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-100 transition"
                 >
                   Sign Up Buyer
                 </button>
                 <button 
-                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); }}
+                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setShowAuthModal(true); }}
                   className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-700 transition shadow-md"
                 >
                   Sign Up Seller
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="flex items-center xl:hidden">
@@ -219,24 +331,24 @@ export default function App() {
             
             <button onClick={() => {setView('howItWorks'); setIsMenuOpen(false)}} className="block w-full text-left px-3 py-2 text-gray-700 font-medium">How It Works</button>
             
-            {!user ? (
+            {userLoaded && clerkUser ? (
+              <button onClick={handleLogout} className="block w-full text-left px-3 py-2 text-red-600 font-medium">Logout</button>
+            ) : userLoaded && !clerkUser ? (
               <div className="pt-4 space-y-2 border-t mt-2">
                 <button 
-                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); setIsMenuOpen(false); }}
+                  onClick={() => { setAuthTargetRole('buyer'); setAuthMode('signup'); setShowAuthModal(true); setIsMenuOpen(false); }}
                   className="block w-full text-center bg-teal-50 text-teal-700 py-2 rounded-md font-bold"
                 >
                   Sign Up Buyer
                 </button>
                 <button 
-                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setOtpSent(false); setShowAuthModal(true); setIsMenuOpen(false); }}
+                  onClick={() => { setAuthTargetRole('seller'); setAuthMode('signup'); setShowAuthModal(true); setIsMenuOpen(false); }}
                   className="block w-full text-center bg-teal-600 text-white py-2 rounded-md font-bold"
                 >
                   Sign Up Seller
                 </button>
               </div>
-            ) : (
-              <button onClick={handleLogout} className="block w-full text-left px-3 py-2 text-red-600 font-medium">Logout</button>
-            )}
+            ) : null}
           </div>
         </div>
       )}
@@ -244,40 +356,56 @@ export default function App() {
   );
 
   const AuthModal = () => {
-    if (!showAuthModal) return null;
+    // Track if we're in OAuth flow
+    const [isOAuthFlow, setIsOAuthFlow] = useState(() => {
+      const hash = window.location.hash;
+      return hash.includes('/oauth') || hash.includes('/sso-callback') || hash.includes('/verify');
+    });
 
-    const handleRequestOtp = (e) => {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const data = {
-        name: formData.get('name'),
-        phone: formData.get('phone'),
-        email: formData.get('email'),
-        type: authTargetRole
+    // Monitor hash changes to detect OAuth flow
+    useEffect(() => {
+      const checkHash = () => {
+        const hash = window.location.hash;
+        const inOAuth = hash.includes('/oauth') || hash.includes('/sso-callback') || hash.includes('/verify');
+        setIsOAuthFlow(inOAuth);
       };
-      setSignupData(data);
-      setOtpSent(true);
-    };
+      
+      checkHash();
+      window.addEventListener('hashchange', checkHash);
+      return () => window.removeEventListener('hashchange', checkHash);
+    }, []);
 
-    const handleVerifyOtp = (e) => {
-      e.preventDefault();
-      handleLoginSuccess(signupData); 
-    };
+    // Close modal after authentication completes (with delay to allow OAuth to finish)
+    useEffect(() => {
+      if (userLoaded && clerkUser && showAuthModal) {
+        // If we're in OAuth flow, wait longer
+        const delay = isOAuthFlow ? 3000 : 1000;
+        
+        const timer = setTimeout(() => {
+          // Double check user is still authenticated before closing
+          if (clerkUser) {
+            setShowAuthModal(false);
+            setIsOAuthFlow(false);
+          }
+        }, delay);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [userLoaded, clerkUser, showAuthModal, isOAuthFlow]);
 
-    const handleLogin = (e) => {
-      e.preventDefault();
-      handleLoginSuccess({
-        name: 'Returning User',
-        phone: '+91 98765 43210',
-        email: 'user@example.com',
-        type: authTargetRole 
-      });
-    };
+    if (!showAuthModal || !userLoaded) return null;
+    
+    // Keep modal open during OAuth flow, even if user appears authenticated
+    // (OAuth might complete but we want to show the success state)
+    if (clerkUser && !isOAuthFlow) {
+      // User is authenticated and OAuth is done, close modal
+      return null;
+    }
 
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
-          <div className="bg-teal-600 px-6 py-4 flex justify-between items-center">
+        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all max-h-[90vh] overflow-y-auto">
+          <div className="bg-teal-600 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
             <h3 className="text-xl font-bold text-white">
               {authMode === 'signup' ? `Sign Up as ${authTargetRole === 'buyer' ? 'Buyer' : 'Seller'}` : 'Login'}
             </h3>
@@ -287,52 +415,56 @@ export default function App() {
           </div>
           
           <div className="p-6">
+            <div className="mb-4 bg-teal-50 p-3 rounded-lg border border-teal-200">
+              <p className="text-sm text-teal-800 font-medium">
+                You are signing up as a <strong>{authTargetRole === 'buyer' ? 'Buyer' : 'Seller'}</strong>
+              </p>
+            </div>
+            
             {authMode === 'signup' ? (
-              !otpSent ? (
-                <form onSubmit={handleRequestOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                    <input name="name" type="text" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="John Doe" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                    <input name="phone" type="tel" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="+91 98765 43210" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                    <input name="email" type="email" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="john@example.com" />
-                  </div>
-                  <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
-                    Get OTP
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="bg-teal-50 p-3 rounded text-center text-sm text-teal-800 mb-4">
-                    OTP sent to {signupData?.phone}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
-                    <input name="otp" type="text" required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-center tracking-widest text-xl focus:ring-teal-500 focus:border-teal-500" placeholder="1 2 3 4" />
-                  </div>
-                  <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
-                    Verify & Complete Sign Up
-                  </button>
-                  <button type="button" onClick={() => setOtpSent(false)} className="w-full text-sm text-gray-500 hover:text-teal-600">
-                    Change Details
-                  </button>
-                </form>
-              )
+              <SignUp 
+                routing="hash"
+                fallbackRedirectUrl={window.location.origin}
+                forceRedirectUrl={window.location.origin}
+                afterSignUpUrl={window.location.origin}
+                signInUrl={window.location.origin + "/#/sign-in"}
+                unsafeMetadata={{ userType: authTargetRole }}
+                afterSignUp={() => {
+                  // Store user type when signup completes
+                  if (clerkUser && authTargetRole) {
+                    localStorage.setItem(`userType_${clerkUser.id}`, authTargetRole);
+                  }
+                }}
+                appearance={{
+                  elements: {
+                    rootBox: "w-full",
+                    card: "shadow-none border-0",
+                    headerTitle: "hidden",
+                    headerSubtitle: "hidden",
+                    socialButtonsBlockButton: "border border-gray-300",
+                  }
+                }}
+              />
             ) : (
-              <form onSubmit={handleLogin} className="space-y-4">
-                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                    <input name="login_phone" type="tel" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-teal-500 focus:border-teal-500" placeholder="+91 98765 43210" />
-                 </div>
-                 <button type="submit" className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 transition shadow-md">
-                   Login with OTP
-                 </button>
-              </form>
+              <SignIn 
+                routing="hash"
+                fallbackRedirectUrl={window.location.origin}
+                forceRedirectUrl={window.location.origin}
+                afterSignInUrl={window.location.origin}
+                signUpUrl={window.location.origin + "/#/sign-up"}
+                afterSignIn={() => {
+                  // Handle after sign in
+                }}
+                appearance={{
+                  elements: {
+                    rootBox: "w-full",
+                    card: "shadow-none border-0",
+                    headerTitle: "hidden",
+                    headerSubtitle: "hidden",
+                    socialButtonsBlockButton: "border border-gray-300",
+                  }
+                }}
+              />
             )}
 
             <div className="mt-6 text-center border-t pt-4">
@@ -340,7 +472,7 @@ export default function App() {
                 {authMode === 'signup' ? "Already have an account?" : "Don't have an account?"}
               </p>
               <button 
-                onClick={() => { setAuthMode(authMode === 'signup' ? 'login' : 'signup'); setOtpSent(false); }}
+                onClick={() => { setAuthMode(authMode === 'signup' ? 'login' : 'signup'); }}
                 className="mt-2 text-teal-600 font-bold hover:underline"
               >
                 {authMode === 'signup' ? 'Login Here' : 'Sign Up Here'}

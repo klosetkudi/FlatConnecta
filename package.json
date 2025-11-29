@@ -8,10 +8,11 @@
     "start": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@clerk/clerk-react": "^5.57.0",
+    "@supabase/supabase-js": "^2.39.7",
     "lucide-react": "^0.269.0",
-    "@supabase/supabase-js": "^2.39.7"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "vite": "^5.0.0"
