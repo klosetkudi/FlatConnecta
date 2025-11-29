@@ -108,7 +108,10 @@ export default function App() {
   // Data States - Active Properties start EMPTY as requested
   const [activeProperties, setActiveProperties] = useState([]); 
   const [pendingProperties, setPendingProperties] = useState([]); // Empty initially, user adds via form
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    // Check if admin is logged in from sessionStorage
+    return sessionStorage.getItem('adminLoggedIn') === 'true';
+  });
 
   // Derive user object from Clerk user and metadata
   // Check both publicMetadata and localStorage for user type
@@ -184,10 +187,52 @@ export default function App() {
     }
   }, [userLoaded, clerkUser]);
 
-  // Listen for hash changes to handle OAuth flow and close modal when auth completes
+  // Check URL pathname and hash for admin routes on mount and when isAdmin changes
   useEffect(() => {
-    const handleHashChange = () => {
+    const pathname = window.location.pathname;
+    const hash = window.location.hash;
+    
+    // Check if user is trying to access admin routes via pathname or hash
+    if (pathname === '/admin' || pathname === '/admin/login' || hash === '#/admin' || hash === '#/admin/login') {
+      if (!isAdmin) {
+        setView('adminLogin');
+        // Update URL to clean path if using hash
+        if (hash && !pathname.includes('/admin')) {
+          window.history.replaceState(null, '', '/admin/login');
+        }
+      } else {
+        setView('admin');
+        // Update URL to clean path if using hash
+        if (hash && !pathname.includes('/admin')) {
+          window.history.replaceState(null, '', '/admin');
+        }
+      }
+    }
+  }, [isAdmin]); // Run when isAdmin changes and on mount
+
+  // Listen for pathname and hash changes to handle routing
+  useEffect(() => {
+    const handleRouteChange = () => {
+      const pathname = window.location.pathname;
       const hash = window.location.hash;
+      
+      // Handle admin routes (check pathname first, then hash for backward compatibility)
+      if (pathname === '/admin' || pathname === '/admin/login' || hash === '#/admin' || hash === '#/admin/login') {
+        if (!isAdmin) {
+          setView('adminLogin');
+          // Normalize to clean path
+          if (hash && !pathname.includes('/admin')) {
+            window.history.replaceState(null, '', '/admin/login');
+          }
+        } else {
+          setView('admin');
+          // Normalize to clean path
+          if (hash && !pathname.includes('/admin')) {
+            window.history.replaceState(null, '', '/admin');
+          }
+        }
+        return;
+      }
       
       // Don't close modal if we're in the middle of OAuth flow
       if (hash.includes('/oauth') || hash.includes('/sso-callback') || hash.includes('/verify')) {
@@ -212,14 +257,17 @@ export default function App() {
       }
     };
 
-    window.addEventListener('hashchange', handleHashChange);
+    // Listen to both popstate (browser back/forward) and hashchange events
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('hashchange', handleRouteChange);
     // Check on mount
-    handleHashChange();
+    handleRouteChange();
 
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('hashchange', handleRouteChange);
     };
-  }, [userLoaded, clerkUser, showAuthModal]);
+  }, [userLoaded, clerkUser, showAuthModal, isAdmin]);
 
   const handleProtectedAction = (action, role) => {
     if (user) {
@@ -239,6 +287,26 @@ export default function App() {
   const handleLogout = async () => {
     await signOut();
     setView('home');
+  };
+
+  const handleAdminLogin = (username, password) => {
+    if (username === 'admin' && password === 'admin@1506') {
+      setIsAdmin(true);
+      sessionStorage.setItem('adminLoggedIn', 'true');
+      setView('admin');
+      // Use clean URL path instead of hash
+      window.history.pushState(null, '', '/admin');
+      return true;
+    }
+    return false;
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    sessionStorage.removeItem('adminLoggedIn');
+    setView('home');
+    // Navigate to home page
+    window.history.pushState(null, '', '/');
   };
 
   // Handle after Clerk sign-in/sign-up
@@ -1170,7 +1238,98 @@ export default function App() {
     );
   };
 
+  const AdminLogin = () => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      setError('');
+      
+      if (handleAdminLogin(username, password)) {
+        // Login successful, handled by handleAdminLogin
+      } else {
+        setError('Invalid username or password');
+      }
+    };
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <div className="flex justify-center">
+              <ShieldCheck className="h-12 w-12 text-teal-600" />
+            </div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Admin Login
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Access admin dashboard to approve sellers' photos & videos
+            </p>
+          </div>
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+            <div className="rounded-md shadow-sm -space-y-px">
+              <div>
+                <label htmlFor="username" className="sr-only">Username</label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-teal-500 focus:border-teal-500 focus:z-10 sm:text-sm"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="sr-only">Password</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-teal-500 focus:border-teal-500 focus:z-10 sm:text-sm"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+              >
+                Sign in
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   const AdminDashboard = () => {
+    // Protect admin dashboard - redirect to login if not authenticated
+    useEffect(() => {
+      if (!isAdmin) {
+        setView('adminLogin');
+        window.history.pushState(null, '', '/admin/login');
+      }
+    }, [isAdmin]);
+
+    if (!isAdmin) {
+      return null;
+    }
+
     const approveProperty = (prop) => {
       setActiveProperties([...activeProperties, prop]);
       setPendingProperties(pendingProperties.filter(p => p.id !== prop.id));
@@ -1186,8 +1345,16 @@ export default function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-          <div className="bg-teal-100 text-teal-800 px-4 py-2 rounded-lg font-semibold">
-            Pending Approvals: {pendingProperties.length}
+          <div className="flex items-center gap-4">
+            <div className="bg-teal-100 text-teal-800 px-4 py-2 rounded-lg font-semibold">
+              Pending Approvals: {pendingProperties.length}
+            </div>
+            <button
+              onClick={handleAdminLogout}
+              className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200 flex items-center"
+            >
+              <LogOut className="h-4 w-4 mr-2" /> Logout
+            </button>
           </div>
         </div>
 
@@ -1352,9 +1519,6 @@ export default function App() {
               <li className="cursor-pointer hover:text-white" onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')}>Browse Flats</li>
               <li className="cursor-pointer hover:text-white" onClick={() => handleProtectedAction(() => setView('post'), 'seller')}>List Property</li>
               <li className="cursor-pointer hover:text-white" onClick={() => setView('howItWorks')}>How It Works</li>
-              <li className="cursor-pointer text-gray-500 hover:text-white mt-2" onClick={() => { setIsAdmin(!isAdmin); setView('admin'); }}>
-                {isAdmin ? "Logout Admin" : "Admin Login"}
-              </li>
             </ul>
           </div>
         </div>
@@ -1367,7 +1531,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
-      <Navbar />
+      {view !== 'adminLogin' && <Navbar />}
       <AuthModal />
       
       <div className="flex-grow">
@@ -1408,6 +1572,7 @@ export default function App() {
         {view === 'howItWorks' && <HowItWorksSection />}
         {view === 'benefits' && <BenefitsSection />}
         {view === 'faq' && <FAQSection />}
+        {view === 'adminLogin' && <AdminLogin />}
         {view === 'admin' && <AdminDashboard />}
       </div>
 
