@@ -1284,5 +1284,3 @@ export default function App() {
     </div>
   );
 }
-
-::contentReference[oaicite:0]{index=0}
