@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from './lib/supabaseClient';
 import { 
   Search, 
   Home, 
@@ -1335,3 +1336,4 @@ export default function App() {
     </div>
   );
 }
+
