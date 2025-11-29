@@ -37,6 +37,8 @@ import {
   Smartphone
 } from 'lucide-react';
 
+import { supabase } from './lib/supabaseClient'
+
 // --- Mock Data (Used for Admin Approval simulation, but Active list starts empty) ---
 const MOCK_PENDING_DATA = [
   {
@@ -109,16 +111,35 @@ export default function App() {
     }
   };
 
-  const handleLoginSuccess = (userData) => {
+  // Supabase-integrated login success handler
+  const handleLoginSuccess = async (userData) => {
     setUser(userData);
     setShowAuthModal(false);
     setOtpSent(false);
     setSignupData(null);
-    
+
+    try {
+      const tableName = userData.type === 'buyer' ? 'buyers' : 'sellers';
+
+      const { error } = await supabase
+        .from(tableName)
+        .insert({
+          name: userData.name,
+          email: userData.email,
+          mobile: userData.phone
+        });
+
+      if (error) {
+        console.error('Supabase insert error:', error);
+      }
+    } catch (err) {
+      console.error('Unexpected Supabase error:', err);
+    }
+
     // Role-based redirection on login
     if (userData.type === 'seller') {
-       // If logging in as seller, maybe go to dashboard or post property? 
-       // Staying on home but UI updates to show seller stuff is fine.
+      // If logging in as seller, maybe go to dashboard or post property? 
+      // Staying on home but UI updates to show seller stuff is fine.
     }
 
     if (pendingAction) {
