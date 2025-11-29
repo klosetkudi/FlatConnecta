@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { 
   Search, 
@@ -31,14 +31,11 @@ import {
   HelpCircle,
   BookOpen,
   Star,
-  thumbsUp,
   Image as ImageIcon,
   LogOut,
   User,
   Smartphone
 } from 'lucide-react';
-
-import { supabase } from './lib/supabaseClient'
 
 // --- Mock Data (Used for Admin Approval simulation, but Active list starts empty) ---
 const MOCK_PENDING_DATA = [
@@ -97,7 +94,6 @@ export default function App() {
 
   const handleProtectedAction = (action, role) => {
     if (user) {
-      // If user is logged in but trying to access a feature not for their role
       if (user.type !== role) {
         alert(`This feature is only available for ${role}s. You are logged in as a ${user.type}.`);
         return;
@@ -107,7 +103,7 @@ export default function App() {
       setPendingAction(() => action);
       setAuthTargetRole(role);
       setAuthMode('signup');
-      setOtpSent(false); // Reset OTP state
+      setOtpSent(false);
       setShowAuthModal(true);
     }
   };
@@ -137,12 +133,6 @@ export default function App() {
       console.error('Unexpected Supabase error:', err);
     }
 
-    // Role-based redirection on login
-    if (userData.type === 'seller') {
-      // If logging in as seller, maybe go to dashboard or post property? 
-      // Staying on home but UI updates to show seller stuff is fine.
-    }
-
     if (pendingAction) {
       pendingAction();
       setPendingAction(null);
@@ -154,29 +144,23 @@ export default function App() {
     setView('home');
   };
 
-  // --- Components ---
-
   const Navbar = () => (
     <nav className="sticky top-0 z-50 bg-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
-          {/* Logo */}
           <div className="flex items-center cursor-pointer flex-shrink-0" onClick={() => setView('home')}>
             <Building className="h-8 w-8 text-teal-600" />
             <span className="ml-2 text-xl font-bold text-gray-900">FlatConnectio</span>
             {isAdmin && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Admin</span>}
           </div>
           
-          {/* Desktop Menu - Sequential Row */}
           <div className="hidden xl:flex items-center space-x-1">
             <button onClick={() => setView('home')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'home' ? 'text-teal-600' : ''}`}>Home</button>
             
-            {/* Buyer Links - Hide if Seller */}
             {(!user || user.type === 'buyer') && (
               <button onClick={() => handleProtectedAction(() => setView('listing'), 'buyer')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'listing' ? 'text-teal-600' : ''}`}>Browse Flats</button>
             )}
 
-            {/* Seller Links - Hide if Buyer */}
             {(!user || user.type === 'seller') && (
               <button onClick={() => handleProtectedAction(() => setView('post'), 'seller')} className={`px-3 py-2 text-sm font-medium text-gray-700 hover:text-teal-600 ${view === 'post' ? 'text-teal-600' : ''}`}>List Property</button>
             )}
@@ -212,7 +196,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <div className="flex items-center xl:hidden">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-700">
               {isMenuOpen ? <X /> : <Menu />}
@@ -221,7 +204,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="xl:hidden bg-white border-t">
           <div className="px-4 pt-4 pb-4 space-y-2">
@@ -264,7 +246,6 @@ export default function App() {
   const AuthModal = () => {
     if (!showAuthModal) return null;
 
-    // Step 1: Collect Info & Trigger OTP
     const handleRequestOtp = (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
@@ -275,20 +256,16 @@ export default function App() {
         type: authTargetRole
       };
       setSignupData(data);
-      setOtpSent(true); // Move to Step 2
+      setOtpSent(true);
     };
 
-    // Step 2: Verify OTP & Finalize
     const handleVerifyOtp = (e) => {
       e.preventDefault();
-      // Simulate OTP check (accept any input for demo)
       handleLoginSuccess(signupData); 
     };
 
-    // Login Handler (Simple simulation)
     const handleLogin = (e) => {
       e.preventDefault();
-      // Simulate existing user login
       handleLoginSuccess({
         name: 'Returning User',
         phone: '+91 98765 43210',
@@ -312,7 +289,6 @@ export default function App() {
           <div className="p-6">
             {authMode === 'signup' ? (
               !otpSent ? (
-                // SIGN UP STEP 1: DETAILS
                 <form onSubmit={handleRequestOtp} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
@@ -331,7 +307,6 @@ export default function App() {
                   </button>
                 </form>
               ) : (
-                // SIGN UP STEP 2: OTP
                 <form onSubmit={handleVerifyOtp} className="space-y-4">
                   <div className="bg-teal-50 p-3 rounded text-center text-sm text-teal-800 mb-4">
                     OTP sent to {signupData?.phone}
@@ -349,7 +324,6 @@ export default function App() {
                 </form>
               )
             ) : (
-              // LOGIN FORM (Simplified for demo)
               <form onSubmit={handleLogin} className="space-y-4">
                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
@@ -378,7 +352,6 @@ export default function App() {
     );
   };
 
-  // SEO & AI-EO Component
   const SEOMetadata = () => {
     const schemaData = {
       "@context": "https://schema.org",
@@ -416,13 +389,9 @@ export default function App() {
     <>
       <div className="relative bg-white overflow-hidden">
         <SEOMetadata />
-        {/* Side-by-Side Layout for Desktop */}
         <div className="max-w-7xl mx-auto">
-          
-          {/* Logic for displaying Hero content based on role */}
           {(!user || user.type === 'buyer') && (
             <div className="flex flex-col lg:flex-row border-b border-gray-100">
-              {/* Buyer Content Side */}
               <div className="lg:w-1/2 py-12 px-4 sm:px-6 lg:py-24 lg:px-8 bg-white flex flex-col justify-center">
                 <div className="sm:text-center lg:text-left">
                   <h1 className="text-4xl tracking-tight font-extrabold text-teal-900 sm:text-5xl md:text-6xl">
@@ -442,7 +411,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Image Side */}
               <div className="lg:w-1/2 relative h-64 sm:h-72 md:h-96 lg:h-auto">
                 <img
                   className="w-full h-full object-cover"
@@ -454,7 +422,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Separated Owner Section - Hidden if User is Buyer */}
           {(!user || user.type === 'seller') && (
             <div className="bg-teal-800 py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between">
@@ -523,7 +490,6 @@ export default function App() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* 1. Money */}
           <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100 flex flex-col">
             <div className="flex items-center mb-4">
               <div className="h-12 w-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-4">
@@ -536,7 +502,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* 2. Time */}
           <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100 flex flex-col">
             <div className="flex items-center mb-4">
               <div className="h-12 w-12 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mr-4">
@@ -549,7 +514,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* 3. Effort */}
           <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100 flex flex-col">
             <div className="flex items-center mb-4">
               <div className="h-12 w-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mr-4">
@@ -562,7 +526,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* 4. Mental Bandwidth */}
           <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100 flex flex-col">
             <div className="flex items-center mb-4">
               <div className="h-12 w-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mr-4">
@@ -578,8 +541,6 @@ export default function App() {
       </div>
     </section>
   );
-
-  // --- SEPARATED GUIDE SECTIONS ---
 
   const HowItWorksSection = () => (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -630,7 +591,6 @@ export default function App() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Renters Benefits - Hidden for Sellers */}
           {(!user || user.type === 'buyer') && (
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-teal-100">
               <h3 className="text-2xl font-bold text-teal-800 mb-6 flex items-center">
@@ -653,7 +613,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Owners Benefits - Hidden for Buyers */}
           {(!user || user.type === 'seller') && (
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-green-100">
               <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
@@ -708,7 +667,6 @@ export default function App() {
   );
 
   const Listings = () => {
-    // Only Buyers should see listings
     if (user && user.type === 'seller') return <div className="py-20 text-center text-xl text-gray-600">Sellers do not browse properties. Please use "List Property".</div>;
 
     const filteredProps = activeProperties.filter(p => {
@@ -803,7 +761,6 @@ export default function App() {
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2">
             <img src={selectedProperty.image} alt={selectedProperty.title} className="w-full h-96 object-cover rounded-xl shadow-lg" />
             
@@ -813,7 +770,6 @@ export default function App() {
                 <MapPin className="h-5 w-5 mr-2 text-teal-500" /> {selectedProperty.location}
               </p>
 
-              {/* Video Section Mock */}
               <div className="mt-6 p-4 bg-gray-900 rounded-lg text-white text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Video className="h-6 w-6 mr-2 text-teal-400" />
@@ -863,7 +819,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Sidebar / Card */}
           <div className="lg:col-span-1">
             <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 sticky top-24">
               <div className="flex justify-between items-center border-b pb-4 mb-4">
@@ -899,7 +854,6 @@ export default function App() {
   };
 
   const PostProperty = () => {
-    // Form State
     const [type, setType] = useState('Apartment');
     const [city, setCity] = useState('');
     const [location, setLocation] = useState('');
@@ -928,9 +882,9 @@ export default function App() {
         city: city,
         rent: parseInt(rent),
         bhk: parseInt(bhk),
-        bathrooms: Math.ceil(parseInt(bhk)/2), // approximation
+        bathrooms: Math.ceil(parseInt(bhk)/2),
         sqft: parseInt(sqft) || 800,
-        image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // placeholder
+        image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
         type: type,
         amenities: ["Gym", "Security"],
         video: videoFile.name,
@@ -951,14 +905,12 @@ export default function App() {
           </div>
           <div className="p-8">
             <form className="space-y-6" onSubmit={handleSubmit}>
-               {/* Info Box */}
                <div className="bg-teal-50 p-4 rounded-lg border border-teal-100 mb-6">
                  <p className="text-sm text-teal-800">
                    <strong>Note:</strong> After submitting, we will schedule a <strong>Consultation Call</strong> with you to capture your tenant preferences, rent expectations, and restrictions before listing.
                  </p>
                </div>
 
-              {/* Photo Upload Section */}
               <div className="bg-teal-50 border border-teal-200 p-4 rounded-lg">
                 <h3 className="text-teal-800 font-bold flex items-center mb-2">
                   <ImageIcon className="h-5 w-5 mr-2" /> Upload Property Photos
@@ -982,7 +934,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Mandatory Video Section */}
               <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
                 <h3 className="text-orange-800 font-bold flex items-center mb-2">
                   <Video className="h-5 w-5 mr-2" /> Mandatory Video Upload
@@ -1171,7 +1122,6 @@ export default function App() {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          {/* Background overlay */}
           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowInquiryModal(false)}></div>
 
           <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
@@ -1283,7 +1233,6 @@ export default function App() {
     </footer>
   );
 
-  // --- Main Render ---
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       <Navbar />
@@ -1297,7 +1246,6 @@ export default function App() {
             <ValueProposition />
             <div className="max-w-7xl mx-auto px-4 py-8">
                <h2 className="text-2xl font-bold text-gray-900 mb-6">Featured Listings</h2>
-               {/* Showing a subset of listings for home page */}
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  {activeProperties.slice(0,3).map(property => (
                    <div key={property.id} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition" onClick={() => { setSelectedProperty(property); setView('details'); }}>
@@ -1337,3 +1285,4 @@ export default function App() {
   );
 }
 
+::contentReference[oaicite:0]{index=0}
