@@ -1,5 +1,5 @@
 {
-  "name": "flatconnectio",
+  "name": "flatconnect",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -17,3 +17,4 @@
     "vite": "^5.0.0"
   }
 }
+
